@@ -12,10 +12,10 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const FinancialHealthRecommendationsInputSchema = z.object({
-  income: z.number().describe('Monthly income in USD.'),
-  expenses: z.number().describe('Monthly expenses in USD.'),
-  debt: z.number().describe('Total debt amount in USD.'),
-  savings: z.number().describe('Total savings amount in USD.'),
+  income: z.number().describe('Monthly income in MXN.'),
+  expenses: z.number().describe('Monthly expenses in MXN.'),
+  debt: z.number().describe('Total debt amount in MXN.'),
+  savings: z.number().describe('Total savings amount in MXN.'),
   goals: z.string().describe('User financial goals.'),
 });
 export type FinancialHealthRecommendationsInput = z.infer<typeof FinancialHealthRecommendationsInputSchema>;

@@ -126,7 +126,7 @@ export default function GoalsPage() {
                     name="income"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Ingreso Mensual (USD)</FormLabel>
+                        <FormLabel>Ingreso Mensual (MXN)</FormLabel>
                         <FormControl>
                           <Input type="number" {...field} />
                         </FormControl>
@@ -297,4 +297,3 @@ export default function GoalsPage() {
     </div>
   );
 }
-    

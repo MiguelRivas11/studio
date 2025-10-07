@@ -82,7 +82,7 @@ export default function HealthPage() {
                   name="income"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Ingreso Mensual (USD)</FormLabel>
+                      <FormLabel>Ingreso Mensual (MXN)</FormLabel>
                       <FormControl>
                         <Input type="number" placeholder="3000" {...field} />
                       </FormControl>
@@ -96,7 +96,7 @@ export default function HealthPage() {
                   name="expenses"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Gastos Mensuales (USD)</FormLabel>
+                      <FormLabel>Gastos Mensuales (MXN)</FormLabel>
                       <FormControl>
                         <Input type="number" placeholder="2500" {...field} />
                       </FormControl>
@@ -110,7 +110,7 @@ export default function HealthPage() {
                   name="debt"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Deuda Total (USD)</FormLabel>
+                      <FormLabel>Deuda Total (MXN)</FormLabel>
                       <FormControl>
                         <Input type="number" placeholder="10000" {...field} />
                       </FormControl>
@@ -124,7 +124,7 @@ export default function HealthPage() {
                   name="savings"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Ahorros Totales (USD)</FormLabel>
+                      <FormLabel>Ahorros Totales (MXN)</FormLabel>
                       <FormControl>
                         <Input type="number" placeholder="5000" {...field} />
                       </FormControl>
