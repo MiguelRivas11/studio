@@ -143,15 +143,15 @@ export default function LearnPage() {
 
         module.lessons.forEach((lesson, lessonIndex) => {
           const lessonRef = doc(collection(firestore, moduleRef.path, 'lessons'));
-          // Explicitly map all fields from the lesson object
-          batch.set(lessonRef, { 
-            moduleId: moduleRef.id, 
+          const { title, detailedContent, practicalTips, realExample, quiz } = lesson;
+          batch.set(lessonRef, {
+            moduleId: moduleRef.id,
             order: lessonIndex,
-            title: lesson.title,
-            detailedContent: lesson.detailedContent,
-            practicalTips: lesson.practicalTips,
-            realExample: lesson.realExample,
-            quiz: lesson.quiz,
+            title,
+            detailedContent,
+            practicalTips,
+            realExample,
+            quiz,
           });
         });
       });
