@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Sidebar,
   SidebarProvider,
@@ -8,12 +10,30 @@ import { MainNav } from "@/components/main-nav"
 import { MobileNav } from "@/components/mobile-nav"
 import { UserNav } from "@/components/user-nav"
 import { Toaster } from "@/components/ui/toaster"
+import { useUser } from "@/firebase";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import { FirebaseClientProvider } from "@/firebase/client-provider";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
+
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider>
       <Sidebar variant="sidebar" collapsible="icon">
@@ -38,5 +58,18 @@ export default function DashboardLayout({
       </div>
       <Toaster />
     </SidebarProvider>
+  );
+}
+
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <FirebaseClientProvider>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </FirebaseClientProvider>
   )
 }
