@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,6 +9,7 @@ import {
   FirestoreError,
   QuerySnapshot,
   CollectionReference,
+  getDocs,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -36,6 +38,34 @@ export interface InternalQuery extends Query<DocumentData> {
     }
   }
 }
+
+async function getSubcollections<T>(snapshot: QuerySnapshot<DocumentData>): Promise<WithId<T>[]> {
+  const results: WithId<T>[] = [];
+  for (const doc of snapshot.docs) {
+      const docData = { ...(doc.data() as T), id: doc.id, modules: [], lessons: [] };
+
+      // Check for 'modules' subcollection
+      const modulesRef = collection(doc.ref, 'modules');
+      const modulesSnapshot = await getDocs(modulesRef);
+      const modules = [];
+      for (const moduleDoc of modulesSnapshot.docs) {
+          const moduleData = { ...(moduleDoc.data() as any), id: moduleDoc.id, lessons: [] };
+
+          // Check for 'lessons' subcollection
+          const lessonsRef = collection(moduleDoc.ref, 'lessons');
+          const lessonsSnapshot = await getDocs(lessonsRef);
+          const lessons = lessonsSnapshot.docs.map(lessonDoc => ({ ...(lessonDoc.data() as any), id: lessonDoc.id }));
+          moduleData.lessons = lessons;
+
+          modules.push(moduleData);
+      }
+      docData.modules = modules;
+
+      results.push(docData as WithId<T>);
+  }
+  return results;
+}
+
 
 /**
  * React hook to subscribe to a Firestore collection or query in real-time.
@@ -75,12 +105,24 @@ export function useCollection<T = any>(
     // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const results: ResultItemType[] = [];
-        for (const doc of snapshot.docs) {
-          results.push({ ...(doc.data() as T), id: doc.id });
+      async (snapshot: QuerySnapshot<DocumentData>) => {
+        
+        // Check if path is for learningPaths to fetch subcollections
+        const path: string = memoizedTargetRefOrQuery.type === 'collection'
+            ? (memoizedTargetRefOrQuery as CollectionReference).path
+            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
+
+        if (path.endsWith('/learningPaths')) {
+            const hierarchicalData = await getSubcollections<T>(snapshot);
+            setData(hierarchicalData);
+        } else {
+            const results: ResultItemType[] = [];
+            for (const doc of snapshot.docs) {
+              results.push({ ...(doc.data() as T), id: doc.id });
+            }
+            setData(results);
         }
-        setData(results);
+
         setError(null);
         setIsLoading(false);
       },
@@ -112,3 +154,4 @@ export function useCollection<T = any>(
   }
   return { data, isLoading, error };
 }
+

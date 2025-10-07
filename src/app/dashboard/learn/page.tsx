@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,8 +33,11 @@ import {
 import {
   generatePersonalizedLearningPath,
   type PersonalizedLearningPathOutput,
+  type PersonalizedLearningPathInput,
 } from '@/ai/flows/personalized-learning-paths';
-import { CheckCircle2, Loader2, School } from 'lucide-react';
+import { CheckCircle2, Loader2, School, Trash2 } from 'lucide-react';
+import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 
 const formSchema = z.object({
   currentKnowledgeLevel: z.enum(['principiante', 'intermedio', 'avanzado'], {
@@ -57,10 +61,35 @@ const formSchema = z.object({
     }),
 });
 
+interface LearningPathDocument {
+  id: string;
+  name: string;
+  description: string;
+  startDate: any;
+  modules: {
+      id: string;
+      title: string;
+      order: number;
+      lessons: {
+          id: string;
+          title: string;
+          order: number;
+      }[];
+  }[];
+}
+
+
 export default function LearnPage() {
-  const [learningPath, setLearningPath] =
-    useState<PersonalizedLearningPathOutput | null>(null);
+  const { user } = useUser();
+  const firestore = useFirestore();
   const [isLoading, setIsLoading] = useState(false);
+
+  const learningPathCollectionRef = useMemoFirebase(() => 
+    user && firestore ? collection(firestore, 'users', user.uid, 'learningPaths') : null
+  , [firestore, user]);
+
+  const { data: learningPaths, isLoading: isLoadingPaths } = useCollection<LearningPathDocument>(learningPathCollectionRef);
+  const activeLearningPath = useMemo(() => learningPaths?.[0], [learningPaths]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -70,18 +99,115 @@ export default function LearnPage() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: PersonalizedLearningPathInput) {
+    if (!firestore || !user) return;
     setIsLoading(true);
-    setLearningPath(null);
+    
     try {
       const result = await generatePersonalizedLearningPath(values);
-      setLearningPath(result);
+      const batch = writeBatch(firestore);
+
+      // Create LearningPath
+      const learningPathRef = doc(collection(firestore, 'users', user.uid, 'learningPaths'));
+      batch.set(learningPathRef, {
+        userId: user.uid,
+        name: `Ruta de aprendizaje para ${values.currentKnowledgeLevel}`,
+        description: `Metas: ${values.financialGoals}`,
+        startDate: serverTimestamp(),
+      });
+
+      // Create Modules and Lessons
+      result.learningPath.forEach((module, moduleIndex) => {
+        const moduleRef = doc(collection(firestore, learningPathRef.path, 'modules'));
+        batch.set(moduleRef, {
+          learningPathId: learningPathRef.id,
+          title: module.title,
+          description: `Módulo ${moduleIndex + 1}`,
+          order: moduleIndex,
+        });
+
+        module.lessons.forEach((lessonTitle, lessonIndex) => {
+          const lessonRef = doc(collection(firestore, moduleRef.path, 'lessons'));
+          batch.set(lessonRef, {
+            moduleId: moduleRef.id,
+            title: lessonTitle,
+            content: 'Contenido de la lección pendiente.',
+            order: lessonIndex,
+          });
+        });
+      });
+      
+      await batch.commit();
+
     } catch (error) {
-      console.error('Error generating learning path:', error);
-      // You could show a toast notification here
+      console.error('Error generating or saving learning path:', error);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function deleteLearningPath() {
+    if (!firestore || !user || !activeLearningPath) return;
+    // For simplicity, we are deleting the path doc, but not subcollections.
+    // In a real app, you'd want to recursively delete modules/lessons.
+    const pathRef = doc(firestore, 'users', user.uid, 'learningPaths', activeLearningPath.id);
+    deleteDocumentNonBlocking(pathRef);
+  }
+
+  if (isLoadingPaths) {
+    return (
+       <div className="flex justify-center items-center h-full p-8">
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
+        </div>
+    );
+  }
+
+  if (activeLearningPath && !isLoading) {
+    return (
+      <div className="p-4 md:p-8 space-y-8">
+        <div className="text-center">
+            <h1 className="text-3xl font-bold font-headline">
+            ¡Aquí está tu ruta!
+            </h1>
+            <p className="mt-2 text-muted-foreground">{activeLearningPath.name}</p>
+        </div>
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <School className="text-primary" />
+                        <span>Módulos de Aprendizaje</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={deleteLearningPath}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Crear Nueva Ruta
+                    </Button>
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Accordion type="single" collapsible className="w-full">
+                    {activeLearningPath.modules.sort((a, b) => a.order - b.order).map((module) => (
+                    <AccordionItem value={`item-${module.id}`} key={module.id}>
+                        <AccordionTrigger className="font-headline text-lg">
+                        {module.title}
+                        </AccordionTrigger>
+                        <AccordionContent>
+                        <ul className="space-y-3 pl-6 list-none">
+                            {module.lessons.sort((a, b) => a.order - b.order).map((lesson) => (
+                            <li key={lesson.id} className="flex items-start">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                                <span>{lesson.title}</span>
+                            </li>
+                            ))}
+                        </ul>
+                        </AccordionContent>
+                    </AccordionItem>
+                    ))}
+                </Accordion>
+            </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -181,52 +307,7 @@ export default function LearnPage() {
           </Form>
         </CardContent>
       </Card>
-
-      {isLoading && (
-        <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-          <p className="mt-2 text-muted-foreground">
-            Estamos creando tu plan de estudios...
-          </p>
-        </div>
-      )}
-
-      {learningPath && (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold font-headline text-center">
-            ¡Aquí está tu ruta!
-          </h2>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <School className="text-primary" />
-                <span>Módulos de Aprendizaje</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Accordion type="single" collapsible className="w-full">
-                {learningPath.learningPath.map((module, moduleIndex) => (
-                  <AccordionItem value={`item-${moduleIndex}`} key={moduleIndex}>
-                    <AccordionTrigger className="font-headline text-lg">
-                      {module.title}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="space-y-3 pl-6 list-none">
-                        {module.lessons.map((lesson, lessonIndex) => (
-                          <li key={lessonIndex} className="flex items-start">
-                            <CheckCircle2 className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
-                            <span>{lesson}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
+
