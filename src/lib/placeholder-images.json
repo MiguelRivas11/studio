@@ -1,3 +1,40 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "dashboard-hero",
+      "description": "A vibrant, abstract image representing financial growth and clarity.",
+      "imageUrl": "https://picsum.photos/seed/101/1200/400",
+      "imageHint": "finance abstract"
+    },
+    {
+      "id": "learning-path",
+      "description": "An image of a person studying or on a path.",
+      "imageUrl": "https://images.unsplash.com/photo-1735830921807-54d1bba5a9d0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxsZWFybmluZyUyMHBhdGh8ZW58MHx8fHwxNzU5Nzc0MTExfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "learning path"
+    },
+    {
+      "id": "chatbot-tutor",
+      "description": "An image representing a friendly robot or chatbot.",
+      "imageUrl": "https://picsum.photos/seed/103/400/300",
+      "imageHint": "robot assistant"
+    },
+    {
+      "id": "financial-health",
+      "description": "An image of a heart with a dollar sign or a healthy plant growing.",
+      "imageUrl": "https://picsum.photos/seed/104/400/300",
+      "imageHint": "growth money"
+    },
+    {
+      "id": "budgeting-simulator",
+      "description": "An image of a calculator, charts, and graphs.",
+      "imageUrl": "https://images.unsplash.com/photo-1707991396652-cf7827abe722?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxjYWxjdWxhdG9yJTIwY2hhcnR8ZW58MHx8fHwxNzU5NzcwODgwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "calculator chart"
+    },
+    {
+      "id": "user-avatar",
+      "description": "A placeholder avatar for the user.",
+      "imageUrl": "https://images.unsplash.com/photo-1590086782792-42dd2350140d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NTk3Nzk4MDR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    }
+  ]
 }
