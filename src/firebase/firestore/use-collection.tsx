@@ -43,7 +43,7 @@ export interface InternalQuery extends Query<DocumentData> {
 async function getSubcollections<T>(snapshot: QuerySnapshot<DocumentData>): Promise<WithId<T>[]> {
   const results: WithId<T>[] = [];
   for (const doc of snapshot.docs) {
-      const docData = { ...(doc.data() as T), id: doc.id, modules: [], lessons: [] };
+      const docData = { ...(doc.data() as T), id: doc.id, modules: [] };
 
       // Check for 'modules' subcollection
       const modulesRef = collection(doc.ref, 'modules');
@@ -132,7 +132,7 @@ export function useCollection<T = any>(
         const path: string =
           memoizedTargetRefOrQuery.type === 'collection'
             ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+            : (memoizedTargetrefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
 
         const contextualError = new FirestorePermissionError({
           operation: 'list',
@@ -155,5 +155,6 @@ export function useCollection<T = any>(
   }
   return { data, isLoading, error };
 }
+
 
 
