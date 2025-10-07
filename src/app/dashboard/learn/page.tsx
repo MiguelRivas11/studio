@@ -33,6 +33,7 @@ import {
 import {
   generatePersonalizedLearningPath,
   type PersonalizedLearningPathInput,
+  type PersonalizedLearningPathOutput,
 } from '@/ai/flows/personalized-learning-paths';
 import { CheckCircle2, Loader2, School, Trash2, Lightbulb, BookCopy, TestTube2, AlertTriangle } from 'lucide-react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
@@ -120,10 +121,9 @@ export default function LearnPage() {
     setIsLoading(true);
     
     try {
-      const result = await generatePersonalizedLearningPath(values);
+      const result: PersonalizedLearningPathOutput = await generatePersonalizedLearningPath(values);
       const batch = writeBatch(firestore);
 
-      // Create LearningPath
       const learningPathRef = doc(collection(firestore, 'users', user.uid, 'learningPaths'));
       batch.set(learningPathRef, {
         userId: user.uid,
@@ -132,7 +132,6 @@ export default function LearnPage() {
         startDate: serverTimestamp(),
       });
 
-      // Create Modules and Lessons
       result.learningPath.forEach((module, moduleIndex) => {
         const moduleRef = doc(collection(firestore, learningPathRef.path, 'modules'));
         batch.set(moduleRef, {
@@ -144,14 +143,15 @@ export default function LearnPage() {
 
         module.lessons.forEach((lesson, lessonIndex) => {
           const lessonRef = doc(collection(firestore, moduleRef.path, 'lessons'));
+          // Explicitly map all fields from the lesson object
           batch.set(lessonRef, { 
-              title: lesson.title,
-              detailedContent: lesson.detailedContent,
-              practicalTips: lesson.practicalTips,
-              realExample: lesson.realExample,
-              quiz: lesson.quiz,
-              moduleId: moduleRef.id, 
-              order: lessonIndex 
+            moduleId: moduleRef.id, 
+            order: lessonIndex,
+            title: lesson.title,
+            detailedContent: lesson.detailedContent,
+            practicalTips: lesson.practicalTips,
+            realExample: lesson.realExample,
+            quiz: lesson.quiz,
           });
         });
       });
@@ -167,8 +167,6 @@ export default function LearnPage() {
 
   async function deleteLearningPath() {
     if (!firestore || !user || !activeLearningPath) return;
-    // For simplicity, we are deleting the path doc, but not subcollections.
-    // In a real app, you'd want to recursively delete modules/lessons.
     const pathRef = doc(firestore, 'users', user.uid, 'learningPaths', activeLearningPath.id);
     deleteDocumentNonBlocking(pathRef);
   }
@@ -181,7 +179,7 @@ export default function LearnPage() {
     setSelectedAnswers(prev => ({ ...prev, [question]: answer }));
   };
 
-  if (isLoadingPaths) {
+  if (isLoadingPaths || isLoading) {
     return (
        <div className="flex justify-center items-center h-full p-8">
           <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
@@ -189,7 +187,7 @@ export default function LearnPage() {
     );
   }
 
-  if (activeLearningPath && !isLoading) {
+  if (activeLearningPath) {
     return (
       <div className="p-4 md:p-8 space-y-8">
         <div className="text-center">
