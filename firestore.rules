@@ -1,184 +1,259 @@
+/**
+ * @fileoverview Firestore Security Rules for the FinLit Tutor application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for user-specific data
+ * and allows public read access to globally shared data (badges).  All user-specific
+ * data is nested under `/users/{userId}` and access is controlled by verifying
+ * that `request.auth.uid` matches the `userId` path parameter.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles.  Only the authenticated user can read/write their own profile.
+ * - /users/{userId}/learningPaths/{learningPathId}: Stores learning paths for a specific user.
+ * - /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}: Stores modules within a learning path.
+ * - /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}/lessons/{lessonId}: Stores lessons within a module.
+ * - /users/{userId}/financialAssessments/{assessmentId}: Stores financial assessments for a specific user.
+ * - /badges/{badgeId}: Stores global badge definitions.  These are publicly readable.
+ * - /users/{userId}/userBadges/{userBadgeId}: Stores the association between users and badges they have earned.
+ * - /users/{userId}/progress/{progressId}: Stores progress information for a specific user.
+ * - /users/{userId}/goals/{goalId}: Stores financial goals for a specific user.
+ * - /users/{userId}/budgets/{budgetId}: Stores budget information for a specific user.
+ *
+ * Key Security Decisions:
+ * - User listing is disallowed.
+ * - Badges are publicly readable but not writable by clients.  A separate mechanism (e.g., Cloud Functions) would be needed to manage badges.
+ * - Ambiguous relationships default to strict owner-only access.
+ *
+ * Denormalization for Authorization:
+ * The `LearningPath`, `FinancialAssessment`, `UserBadge`, and `Progress` collections each include the `userId` field.
+ * This allows security rules to validate user access without needing to perform `get()` operations on parent documents.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user's ID matches the provided userId.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user's ID matches the provided userId and that the document exists.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
-    }
-
-    /**
-     * @description Enforces document ownership for writes.
+     * @description Controls access to user profiles.  Only the authenticated user can read or write their own profile.
      * @path /users/{userId}
-     * @allow (create) User with ID matching auth.uid can create their profile.
-     * @deny (create) User with ID not matching auth.uid cannot create a profile.
-     * @allow (get) Any user can get this document.
-     * @deny (update) User cannot update if not owner.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, create, update, delete) if the user's ID matches the requested ID.
+     * @deny (get, create, update, delete) if the user's ID does not match the requested ID.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
-      allow get: if true;
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Restricts access to learning paths to the owning user.
+     * @description Controls access to learning paths specific to a user. Only the owner can read or write.
      * @path /users/{userId}/learningPaths/{learningPathId}
-     * @allow (create) User can create a learning path with their ID.
-     * @deny (create) User cannot create a learning path for another user.
-     * @allow (get) User can read their own learning path.
-     * @deny (update) User cannot update another user's learning path.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, create, update, delete) if the user's ID matches the requested ID and the userId in the document.
+     * @deny (get, create, update, delete) if the user's ID does not match the requested ID or the userId in the document.
+     * @principle Enforces document ownership and validates the userId in the document on create.
      */
     match /users/{userId}/learningPaths/{learningPathId} {
-      allow get, list: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Restricts access to modules to the owning user.
+     * @description Controls access to modules within a learning path. Only the owner of the learning path can read or write.
      * @path /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}
-     * @allow (create) User can create a module within their learning path.
-     * @deny (create) User cannot create a module for another user's learning path.
-     * @allow (get) User can read their own module.
-     * @deny (update) User cannot update another user's module.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, create, update, delete) if the user is the owner.
+     * @deny (get, create, update, delete) if the user is not the owner.
+     * @principle Inherits authorization from the parent learning path.
      */
     match /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId} {
-      allow get, list: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Restricts access to lessons to the owning user.
+     * @description Controls access to lessons within a module. Only the owner of the module can read or write.
      * @path /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}/lessons/{lessonId}
-     * @allow (create) User can create a lesson within their module.
-     * @deny (create) User cannot create a lesson for another user's module.
-     * @allow (get) User can read their own lesson.
-     * @deny (update) User cannot update another user's lesson.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, create, update, delete) if the user is the owner.
+     * @deny (get, create, update, delete) if the user is not the owner.
+     * @principle Inherits authorization from the parent module.
      */
     match /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}/lessons/{lessonId} {
-      allow get, list: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Restricts access to financial assessments to the owning user.
+     * @description Controls access to financial assessments for a specific user. Only the owner can read or write.
      * @path /users/{userId}/financialAssessments/{assessmentId}
-     * @allow (create) User can create a financial assessment with their ID.
-     * @deny (create) User cannot create a financial assessment for another user.
-     * @allow (get) User can read their own financial assessment.
-     * @deny (update) User cannot update another user's financial assessment.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, create, update, delete) if the user's ID matches the requested ID and the userId in the document.
+     * @deny (get, create, update, delete) if the user's ID does not match the requested ID or the userId in the document.
+     * @principle Enforces document ownership and validates the userId in the document on create.
      */
     match /users/{userId}/financialAssessments/{assessmentId} {
-      allow get, list: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows public read access to badges.
+     * @description Controls access to global badge definitions.  Badges are globally accessible and not writable by clients.
      * @path /badges/{badgeId}
-     * @allow (get) Any user can read badges.
-     * @deny (create) Writes are not defined, so denied.
-     * @principle Allows public read, restricts write access.
+     * @allow (get, list) for all users.
+     * @deny (create, update, delete) for all users.  Badges are managed through a separate admin process.
+     * @principle Public read access with restricted writes.
      */
     match /badges/{badgeId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if true;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     /**
-     * @description Restricts access to user badges to the owning user.
+     * @description Controls access to the association between users and badges they have earned. Only the owner can read or write.
      * @path /users/{userId}/userBadges/{userBadgeId}
-     * @allow (create) User can create a user badge with their ID.
-     * @deny (create) User cannot create a user badge for another user.
-     * @allow (get) User can read their own user badge.
-     * @deny (update) User cannot update another user's user badge.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, create, update, delete) if the user's ID matches the requested ID and the userId in the document.
+     * @deny (get, create, update, delete) if the user's ID does not match the requested ID or the userId in the document.
+     * @principle Enforces document ownership and validates the userId in the document on create.
      */
     match /users/{userId}/userBadges/{userBadgeId} {
-      allow get, list: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Restricts access to progress to the owning user.
+     * @description Controls access to progress information for a specific user. Only the owner can read or write.
      * @path /users/{userId}/progress/{progressId}
-     * @allow (create) User can create progress with their ID.
-     * @deny (create) User cannot create progress for another user.
-     * @allow (get) User can read their own progress.
-     * @deny (update) User cannot update another user's progress.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, create, update, delete) if the user's ID matches the requested ID and the userId in the document.
+     * @deny (get, create, update, delete) if the user's ID does not match the requested ID or the userId in the document.
+     * @principle Enforces document ownership and validates the userId in the document on create.
      */
     match /users/{userId}/progress/{progressId} {
-      allow get, list: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
 
-      /**
-       * @description Restricts access to goals to the owning user.
-       * @path /users/{userId}/goals/{goalId}
-       * @allow (create) User can create a goal with their ID.
-       * @deny (create) User cannot create a goal for another user.
-       * @allow (get) User can read their own goal.
-       * @deny (update) User cannot update another user's goal.
-       * @principle Enforces document ownership for writes.
-       */
+    /**
+     * @description Controls access to financial goals for a specific user.
+     * @path /users/{userId}/goals/{goalId}
+     * @allow (get, create, update, delete) if the user's ID matches the requested ID.
+     * @deny (get, create, update, delete) if the user's ID does not match the requested ID.
+     * @principle Enforces document ownership for all operations.
+     */
     match /users/{userId}/goals/{goalId} {
-      allow get, list: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
 
-     /**
-      * @description Restricts access to budget to the owning user.
-      * @path /users/{userId}/budgets/{budgetId}
-      * @allow (create) User can create a budget with their ID.
-      * @deny (create) User cannot create a budget for another user.
-      * @allow (get) User can read their own budget.
-      * @deny (update) User cannot update another user's budget.
-      * @principle Enforces document ownership for writes.
-      */
+       /**
+        * @description Controls access to budget information for a specific user.
+        * @path /users/{userId}/budgets/{budgetId}
+        * @allow (get, create, update, delete) if the user's ID matches the requested ID.
+        * @deny (get, create, update, delete) if the user's ID does not match the requested ID.
+        * @principle Enforces document ownership for all operations.
+        */
     match /users/{userId}/budgets/{budgetId} {
-      allow get, list: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
   }
