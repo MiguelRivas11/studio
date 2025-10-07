@@ -144,7 +144,15 @@ export default function LearnPage() {
 
         module.lessons.forEach((lesson, lessonIndex) => {
           const lessonRef = doc(collection(firestore, moduleRef.path, 'lessons'));
-          batch.set(lessonRef, { ...lesson, moduleId: moduleRef.id, order: lessonIndex });
+          batch.set(lessonRef, { 
+              title: lesson.title,
+              detailedContent: lesson.detailedContent,
+              practicalTips: lesson.practicalTips,
+              realExample: lesson.realExample,
+              quiz: lesson.quiz,
+              moduleId: moduleRef.id, 
+              order: lessonIndex 
+          });
         });
       });
       
@@ -248,7 +256,7 @@ export default function LearnPage() {
                                             <div key={i}>
                                               <p className="font-medium mb-2">{q.question}</p>
                                               <div className="space-y-1">
-                                                {q.options.map(opt => (
+                                                {(q.options || []).map(opt => (
                                                   <div key={opt} className="flex items-center gap-2">
                                                     <input type="radio" id={`${lesson.id}-${i}-${opt}`} name={`${lesson.id}-${i}`} value={opt} onChange={() => handleAnswerChange(q.question, opt)} disabled={showResults[lesson.id]}/>
                                                     <label htmlFor={`${lesson.id}-${i}-${opt}`}>{opt}</label>
@@ -381,6 +389,3 @@ export default function LearnPage() {
     </div>
   );
 }
-
-
-    
