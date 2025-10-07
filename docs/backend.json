@@ -1,0 +1,458 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the Financial Literacy Tutor application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the user."
+        },
+        "registrationDate": {
+          "type": "string",
+          "description": "Date and time the user registered.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "firstName",
+        "lastName",
+        "registrationDate"
+      ]
+    },
+    "LearningPath": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LearningPath",
+      "type": "object",
+      "description": "Represents a personalized financial literacy learning path for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the LearningPath entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N LearningPath)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the learning path."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the learning path."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Date when the learning path started.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "Date when the learning path ended (or is expected to end).",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "description",
+        "startDate"
+      ]
+    },
+    "Module": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Module",
+      "type": "object",
+      "description": "Represents a module within a learning path.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Module entity."
+        },
+        "learningPathId": {
+          "type": "string",
+          "description": "Reference to LearningPath. (Relationship: LearningPath 1:N Module)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the module."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the module."
+        },
+        "order": {
+          "type": "number",
+          "description": "Order of the module within the learning path."
+        }
+      },
+      "required": [
+        "id",
+        "learningPathId",
+        "title",
+        "description",
+        "order"
+      ]
+    },
+    "Lesson": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Lesson",
+      "type": "object",
+      "description": "Represents a lesson within a module.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Lesson entity."
+        },
+        "moduleId": {
+          "type": "string",
+          "description": "Reference to Module. (Relationship: Module 1:N Lesson)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the lesson."
+        },
+        "content": {
+          "type": "string",
+          "description": "Content of the lesson (e.g., text, HTML)."
+        },
+        "order": {
+          "type": "number",
+          "description": "Order of the lesson within the module."
+        }
+      },
+      "required": [
+        "id",
+        "moduleId",
+        "title",
+        "content",
+        "order"
+      ]
+    },
+    "FinancialAssessment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FinancialAssessment",
+      "type": "object",
+      "description": "Represents a user's financial health assessment.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the FinancialAssessment entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N FinancialAssessment)"
+        },
+        "assessmentDate": {
+          "type": "string",
+          "description": "Date and time the assessment was taken.",
+          "format": "date-time"
+        },
+        "score": {
+          "type": "number",
+          "description": "Overall score of the assessment."
+        },
+        "recommendations": {
+          "type": "string",
+          "description": "Personalized recommendations based on the assessment results."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "assessmentDate",
+        "score",
+        "recommendations"
+      ]
+    },
+    "Badge": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Badge",
+      "type": "object",
+      "description": "Represents a badge earned by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Badge entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the badge."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the badge."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the badge image.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "imageUrl"
+      ]
+    },
+    "UserBadge": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserBadge",
+      "type": "object",
+      "description": "Represents the association between a user and a badge they have earned.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserBadge entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N UserBadge)"
+        },
+        "badgeId": {
+          "type": "string",
+          "description": "Reference to Badge. (Relationship: Badge 1:N UserBadge)"
+        },
+        "earnedDate": {
+          "type": "string",
+          "description": "Date and time the badge was earned.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "badgeId",
+        "earnedDate"
+      ]
+    },
+    "Progress": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Progress",
+      "type": "object",
+      "description": "Represents the progress of a user in a learning path or module.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Progress entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Progress)"
+        },
+        "moduleId": {
+          "type": "string",
+          "description": "Reference to Module. (Relationship: Module 1:N Progress).  Can be null if tracking overall learning path progress."
+        },
+        "lessonId": {
+          "type": "string",
+          "description": "Reference to Lesson. (Relationship: Lesson 1:N Progress). Can be null if tracking overall module progress"
+        },
+        "completionDate": {
+          "type": "string",
+          "description": "Date and time the module or lesson was completed.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Root-level collection to facilitate user management and authentication.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/learningPaths/{learningPathId}",
+        "definition": {
+          "entityName": "LearningPath",
+          "schema": {
+            "$ref": "#/backend/entities/LearningPath"
+          },
+          "description": "Stores learning paths specific to a user. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "learningPathId",
+              "description": "The unique identifier for the learning path."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}",
+        "definition": {
+          "entityName": "Module",
+          "schema": {
+            "$ref": "#/backend/entities/Module"
+          },
+          "description": "Stores modules within a specific learning path. Inherits authorization context from the parent learning path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "learningPathId",
+              "description": "The unique identifier for the learning path."
+            },
+            {
+              "name": "moduleId",
+              "description": "The unique identifier for the module."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}/lessons/{lessonId}",
+        "definition": {
+          "entityName": "Lesson",
+          "schema": {
+            "$ref": "#/backend/entities/Lesson"
+          },
+          "description": "Stores lessons within a specific module. Inherits authorization context from the parent module.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "learningPathId",
+              "description": "The unique identifier for the learning path."
+            },
+            {
+              "name": "moduleId",
+              "description": "The unique identifier for the module."
+            },
+            {
+              "name": "lessonId",
+              "description": "The unique identifier for the lesson."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/financialAssessments/{assessmentId}",
+        "definition": {
+          "entityName": "FinancialAssessment",
+          "schema": {
+            "$ref": "#/backend/entities/FinancialAssessment"
+          },
+          "description": "Stores financial assessments for a specific user. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "assessmentId",
+              "description": "The unique identifier for the financial assessment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/badges/{badgeId}",
+        "definition": {
+          "entityName": "Badge",
+          "schema": {
+            "$ref": "#/backend/entities/Badge"
+          },
+          "description": "Stores global badge definitions.  Badges are globally accessible.",
+          "params": [
+            {
+              "name": "badgeId",
+              "description": "The unique identifier for the badge."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/userBadges/{userBadgeId}",
+        "definition": {
+          "entityName": "UserBadge",
+          "schema": {
+            "$ref": "#/backend/entities/UserBadge"
+          },
+          "description": "Stores the association between users and badges they have earned. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "userBadgeId",
+              "description": "The unique identifier for the user badge."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/progress/{progressId}",
+        "definition": {
+          "entityName": "Progress",
+          "schema": {
+            "$ref": "#/backend/entities/Progress"
+          },
+          "description": "Stores progress information for a specific user. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "progressId",
+              "description": "The unique identifier for the progress entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the FinLit Tutor application. User-owned data is stored under the `/users/{userId}` path, enabling secure and efficient ownership-based security rules. For collaborative data, such as future community forum features, the membership map pattern would be used, with denormalization of relevant data for Authorization Independence.\n\nAuthorization Independence is achieved through denormalization. Specifically, the `LearningPath`, `FinancialAssessment`, and `Progress` collections each include the `userId` field. This allows security rules to validate user access without needing to perform `get()` operations on parent documents. For example, when creating a `LearningPath`, the rule can directly check if `request.auth.uid == request.resource.data.userId`. This approach avoids hierarchical authorization dependencies, ensures atomic operations, and enhances debuggability.\n\nTo support the QAPs (Rules are not Filters), structural segregation is employed. Private user data (Learning Paths, Assessments, Progress) is stored under the `/users/{userId}` collection group, ensuring that list operations can be securely performed without exposing data from other users. The absence of global roles (DBAC) simplifies security rules, relying solely on `request.auth.uid` for authorization. The structure enforces invariants, such as ownership, through explicit path-based ownership and data validation rules.\n\nFuture expansion will introduce a 'community' feature. The suggested collection structures would support collaborative features like community forums where Authorization Independence will be key."
+  }
+}

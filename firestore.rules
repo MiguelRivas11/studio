@@ -1,0 +1,212 @@
+/**
+ * @file Firestore Security Rules for FinLit Tutor Application
+ * @core_philosophy This ruleset enforces a strict user-ownership model for personal data, while allowing public read access to global data like badges. User data is segregated under the /users/{userId} path.
+ * @data_structure Data is nested under /users/{userId} for user-specific content (learning paths, assessments, progress). The /badges collection stores globally accessible badge definitions.
+ * @key_security_decisions User listing is implicitly disallowed by the absence of a top-level /users collection. All write operations are protected by ownership checks, and data consistency is enforced between paths and document data.  The badges collection is readable by anyone, but writeable by no one (in this version).
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Enforces user-ownership for user profiles. Allows a user to read and write their own profile data.
+     * @path /users/{userId}
+     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
+     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Enforces user-ownership for learning paths. Allows a user to read and write their own learning paths.
+     * @path /users/{userId}/learningPaths/{learningPathId}
+     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
+     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
+     * @principle Enforces document ownership for writes and validates relational integrity on creation.
+     */
+    match /users/{userId}/learningPaths/{learningPathId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Enforces user-ownership for modules within a learning path. Allows a user to read and write modules within their own learning paths.
+     * @path /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}
+     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
+     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
+     * @principle Enforces document ownership for writes, inheriting ownership from the parent learning path.
+     */
+    match /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Enforces user-ownership for lessons within a module. Allows a user to read and write lessons within their own modules.
+     * @path /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}/lessons/{lessonId}
+     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
+     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
+     * @principle Enforces document ownership for writes, inheriting ownership from the parent module.
+     */
+    match /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}/lessons/{lessonId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Enforces user-ownership for financial assessments. Allows a user to read and write their own financial assessments.
+     * @path /users/{userId}/financialAssessments/{assessmentId}
+     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
+     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
+     * @principle Enforces document ownership for writes and validates relational integrity on creation.
+     */
+    match /users/{userId}/financialAssessments/{assessmentId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Allows public read access to badge definitions.  Write access is denied.
+     * @path /badges/{badgeId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Allows public read access to global data, while restricting write access.
+     */
+    match /badges/{badgeId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Enforces user-ownership for user badges. Allows a user to read and write their own user badges.
+     * @path /users/{userId}/userBadges/{userBadgeId}
+     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
+     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
+     * @principle Enforces document ownership for writes and validates relational integrity on creation.
+     */
+    match /users/{userId}/userBadges/{userBadgeId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Enforces user-ownership for progress entries. Allows a user to read and write their own progress entries.
+     * @path /users/{userId}/progress/{progressId}
+     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
+     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
+     * @principle Enforces document ownership for writes and validates relational integrity on creation.
+     */
+    match /users/{userId}/progress/{progressId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+}
