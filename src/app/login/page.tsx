@@ -13,6 +13,7 @@ import { FirebaseClientProvider, useAuth, useUser, initiateEmailSignIn, initiate
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/icons';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido.'),
@@ -58,10 +59,22 @@ function LoginPageContent() {
     // Note: We are not updating the user's display name here. This can be added later.
   };
 
-  const handleAdminLogin = () => {
-    loginForm.setValue('email', 'admin@tutor.com');
-    loginForm.setValue('password', 'password');
-    handleLogin({ email: 'admin@tutor.com', password: 'password' });
+  const handleAdminLogin = async () => {
+    setIsLoading(true);
+    const email = 'admin@tutor.com';
+    const password = 'password';
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        // If user doesn't exist or credential is wrong (which can happen on first try), create it.
+        initiateEmailSignUp(auth, email, password);
+      } else {
+        console.error("Error during admin login:", error);
+        setIsLoading(false);
+      }
+    }
   }
 
   if (isUserLoading || user) {
