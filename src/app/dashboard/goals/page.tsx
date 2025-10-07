@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +12,8 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recha
 import { DollarSign, Goal, PlusCircle, Trash2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
+import { collection, doc, where, query } from 'firebase/firestore';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -33,10 +35,19 @@ const goalSchema = z.object({
   savedAmount: z.coerce.number().min(0, 'Lo ahorrado debe ser positivo.'),
 });
 
-type Goal = z.infer<typeof goalSchema>;
+type GoalData = z.infer<typeof goalSchema>;
+type GoalDocument = GoalData & { id: string };
 
 export default function GoalsPage() {
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const goalsCollection = useMemoFirebase(() => user && firestore && collection(firestore, 'users', user.uid, 'goals'), [firestore, user]);
+  const { data: goals = [] } = useCollection<GoalDocument>(goalsCollection);
+  
+  const budgetCollection = useMemoFirebase(() => user && firestore && collection(firestore, 'users', user.uid, 'budgets'), [firestore, user]);
+  const { data: budgetData } = useCollection<BudgetFormValues & { id: string }>(budgetCollection);
+  const userBudget = budgetData?.[0];
 
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetSchema),
@@ -51,29 +62,44 @@ export default function GoalsPage() {
     },
   });
 
+  useEffect(() => {
+    if (userBudget) {
+      form.reset(userBudget);
+    }
+  }, [userBudget, form]);
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'expenses',
   });
 
-  const watchIncome = form.watch('income');
-  const watchExpenses = form.watch('expenses');
+  const watchAllFields = form.watch();
+  const totalExpenses = watchAllFields.expenses.reduce((acc, expense) => acc + (expense.amount || 0), 0);
+  const remainingBalance = watchAllFields.income - totalExpenses;
+  
+  useEffect(() => {
+    if(user && firestore && form.formState.isDirty) {
+        const budgetDocRef = userBudget ? doc(firestore, 'users', user.uid, 'budgets', userBudget.id) : doc(collection(firestore, 'users', user.uid, 'budgets'));
+        setDocumentNonBlocking(budgetDocRef, { ...watchAllFields, userId: user.uid }, { merge: true });
+    }
+  }, [watchAllFields, user, firestore, userBudget, form.formState.isDirty]);
 
-  const totalExpenses = watchExpenses.reduce((acc, expense) => acc + (expense.amount || 0), 0);
-  const remainingBalance = watchIncome - totalExpenses;
 
-  const goalForm = useForm<Goal>({
+  const goalForm = useForm<GoalData>({
     resolver: zodResolver(goalSchema),
     defaultValues: { name: '', targetAmount: 1000, savedAmount: 0 },
   });
 
-  const onAddGoal: SubmitHandler<Goal> = (data) => {
-    setGoals([...goals, data]);
+  const onAddGoal: SubmitHandler<GoalData> = (data) => {
+    if (!goalsCollection) return;
+    addDocumentNonBlocking(goalsCollection, { ...data, userId: user?.uid });
     goalForm.reset();
   };
   
-  const removeGoal = (index: number) => {
-    setGoals(goals.filter((_, i) => i !== index));
+  const removeGoal = (id: string) => {
+    if (!user || !firestore) return;
+    const goalDocRef = doc(firestore, 'users', user.uid, 'goals', id);
+    deleteDocumentNonBlocking(goalDocRef);
   }
 
   return (
@@ -197,13 +223,13 @@ export default function GoalsPage() {
                </Form>
                <Separator className="my-4" />
                <div className="space-y-4">
-                 {goals.length === 0 ? (
+                 {(goals ?? []).length === 0 ? (
                     <p className="text-sm text-center text-muted-foreground">Aún no has añadido ninguna meta.</p>
-                 ) : goals.map((goal, index) => (
-                    <div key={index} className="space-y-2">
+                 ) : (goals ?? []).map((goal) => (
+                    <div key={goal.id} className="space-y-2">
                         <div className="flex justify-between items-center">
                             <span className="font-medium">{goal.name}</span>
-                             <Button variant="ghost" size="icon" onClick={() => removeGoal(index)}>
+                             <Button variant="ghost" size="icon" onClick={() => removeGoal(goal.id)}>
                                 <Trash2 className="h-4 w-4 text-destructive/70" />
                             </Button>
                         </div>
@@ -227,7 +253,7 @@ export default function GoalsPage() {
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie
-                      data={watchExpenses}
+                      data={watchAllFields.expenses}
                       dataKey="amount"
                       nameKey="name"
                       cx="50%"
@@ -236,7 +262,7 @@ export default function GoalsPage() {
                       fill="#8884d8"
                       label={(entry) => `${entry.name}: $${entry.amount}`}
                     >
-                      {watchExpenses.map((entry, index) => (
+                      {watchAllFields.expenses.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -251,7 +277,7 @@ export default function GoalsPage() {
               <div className="space-y-4 text-lg">
                  <div className="flex justify-between">
                     <span>Ingreso Total:</span>
-                    <span className="font-bold text-green-600">+ ${watchIncome.toLocaleString()}</span>
+                    <span className="font-bold text-green-600">+ ${watchAllFields.income.toLocaleString()}</span>
                  </div>
                  <div className="flex justify-between">
                     <span>Gasto Total:</span>
@@ -271,3 +297,4 @@ export default function GoalsPage() {
     </div>
   );
 }
+    

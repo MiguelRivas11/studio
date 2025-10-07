@@ -278,6 +278,60 @@
         "id",
         "userId"
       ]
+    },
+    "Goal": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Goal",
+      "type": "object",
+      "description": "Represents a financial goal for a user.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the financial goal."
+        },
+        "targetAmount": {
+          "type": "number",
+          "description": "The target amount to save for the goal."
+        },
+        "savedAmount": {
+          "type": "number",
+          "description": "The amount already saved for the goal."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User."
+        }
+      },
+      "required": ["name", "targetAmount", "savedAmount", "userId"]
+    },
+    "Budget": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Budget",
+      "type": "object",
+      "description": "Represents a user's budget.",
+      "properties": {
+        "income": {
+          "type": "number",
+          "description": "Monthly income."
+        },
+        "expenses": {
+          "type": "array",
+          "description": "List of monthly expenses.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "amount": {"type": "number"}
+            },
+            "required": ["name", "amount"]
+          }
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User."
+        }
+      },
+      "required": ["income", "expenses", "userId"]
     }
   },
   "auth": {
@@ -451,8 +505,49 @@
             }
           ]
         }
+      },
+       {
+        "path": "/users/{userId}/goals/{goalId}",
+        "definition": {
+          "entityName": "Goal",
+          "schema": {
+            "$ref": "#/backend/entities/Goal"
+          },
+          "description": "Stores financial goals for a specific user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "goalId",
+              "description": "The unique identifier for the goal."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/budgets/{budgetId}",
+        "definition": {
+          "entityName": "Budget",
+          "schema": {
+            "$ref": "#/backend/entities/Budget"
+          },
+          "description": "Stores budget information for a specific user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "budgetId",
+              "description": "The unique identifier for the budget entry."
+            }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the FinLit Tutor application. User-owned data is stored under the `/users/{userId}` path, enabling secure and efficient ownership-based security rules. For collaborative data, such as future community forum features, the membership map pattern would be used, with denormalization of relevant data for Authorization Independence.\n\nAuthorization Independence is achieved through denormalization. Specifically, the `LearningPath`, `FinancialAssessment`, and `Progress` collections each include the `userId` field. This allows security rules to validate user access without needing to perform `get()` operations on parent documents. For example, when creating a `LearningPath`, the rule can directly check if `request.auth.uid == request.resource.data.userId`. This approach avoids hierarchical authorization dependencies, ensures atomic operations, and enhances debuggability.\n\nTo support the QAPs (Rules are not Filters), structural segregation is employed. Private user data (Learning Paths, Assessments, Progress) is stored under the `/users/{userId}` collection group, ensuring that list operations can be securely performed without exposing data from other users. The absence of global roles (DBAC) simplifies security rules, relying solely on `request.auth.uid` for authorization. The structure enforces invariants, such as ownership, through explicit path-based ownership and data validation rules.\n\nFuture expansion will introduce a 'community' feature. The suggested collection structures would support collaborative features like community forums where Authorization Independence will be key."
   }
 }
+    
