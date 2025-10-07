@@ -205,14 +205,14 @@ export default function LearnPage() {
             </CardHeader>
             <CardContent>
                 <Accordion type="single" collapsible className="w-full">
-                    {activeLearningPath.modules.sort((a, b) => a.order - b.order).map((module) => (
+                    {(activeLearningPath.modules || []).sort((a, b) => a.order - b.order).map((module) => (
                     <AccordionItem value={`module-${module.id}`} key={module.id}>
                         <AccordionTrigger className="font-headline text-lg hover:no-underline">
                           {module.title}
                         </AccordionTrigger>
                         <AccordionContent>
                            <Accordion type="single" collapsible className="w-full pl-4">
-                             {module.lessons.sort((a, b) => a.order - b.order).map((lesson) => (
+                             {(module.lessons || []).sort((a, b) => a.order - b.order).map((lesson) => (
                                 <AccordionItem value={`lesson-${lesson.id}`} key={lesson.id}>
                                   <AccordionTrigger className="text-base">
                                     <div className="flex items-center gap-2">
@@ -228,7 +228,7 @@ export default function LearnPage() {
                                       <div>
                                         <h4 className="font-semibold flex items-center gap-2 mb-3"><Lightbulb className="text-yellow-500"/>Tips Prácticos</h4>
                                         <ul className="space-y-2 list-disc pl-5 text-muted-foreground">
-                                          {lesson.practicalTips.map((tip, i) => <li key={i}>{tip}</li>)}
+                                          {(lesson.practicalTips || []).map((tip, i) => <li key={i}>{tip}</li>)}
                                         </ul>
                                       </div>
 
@@ -244,7 +244,7 @@ export default function LearnPage() {
                                       <div className="p-4 bg-muted/50 rounded-lg">
                                         <h4 className="font-semibold flex items-center gap-2 mb-4"><TestTube2 className="text-purple-500"/>Pon a prueba tu conocimiento</h4>
                                         <div className="space-y-4">
-                                          {lesson.quiz.map((q, i) => (
+                                          {(lesson.quiz || []).map((q, i) => (
                                             <div key={i}>
                                               <p className="font-medium mb-2">{q.question}</p>
                                               <div className="space-y-1">
@@ -382,3 +382,5 @@ export default function LearnPage() {
   );
 }
 
+
+    
