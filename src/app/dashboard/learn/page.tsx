@@ -32,12 +32,12 @@ import {
 } from '@/components/ui/accordion';
 import {
   generatePersonalizedLearningPath,
-  type PersonalizedLearningPathOutput,
   type PersonalizedLearningPathInput,
 } from '@/ai/flows/personalized-learning-paths';
-import { CheckCircle2, Loader2, School, Trash2 } from 'lucide-react';
-import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { CheckCircle2, Loader2, School, Trash2, Lightbulb, BookCopy, TestTube2, AlertTriangle } from 'lucide-react';
+import { useUser, useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { Separator } from '@/components/ui/separator';
 
 const formSchema = z.object({
   currentKnowledgeLevel: z.enum(['principiante', 'intermedio', 'avanzado'], {
@@ -61,21 +61,35 @@ const formSchema = z.object({
     }),
 });
 
+interface QuizQuestion {
+    question: string;
+    options: string[];
+    correctAnswer: string;
+}
+
+interface Lesson {
+    id: string;
+    title: string;
+    detailedContent: string;
+    practicalTips: string[];
+    realExample: string;
+    quiz: QuizQuestion[];
+    order: number;
+}
+
+interface Module {
+    id: string;
+    title: string;
+    order: number;
+    lessons: Lesson[];
+}
+
 interface LearningPathDocument {
   id: string;
   name: string;
   description: string;
   startDate: any;
-  modules: {
-      id: string;
-      title: string;
-      order: number;
-      lessons: {
-          id: string;
-          title: string;
-          order: number;
-      }[];
-  }[];
+  modules: Module[];
 }
 
 
@@ -83,6 +97,8 @@ export default function LearnPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
+  const [showResults, setShowResults] = useState<Record<string, boolean>>({});
 
   const learningPathCollectionRef = useMemoFirebase(() => 
     user && firestore ? collection(firestore, 'users', user.uid, 'learningPaths') : null
@@ -126,14 +142,9 @@ export default function LearnPage() {
           order: moduleIndex,
         });
 
-        module.lessons.forEach((lessonTitle, lessonIndex) => {
+        module.lessons.forEach((lesson, lessonIndex) => {
           const lessonRef = doc(collection(firestore, moduleRef.path, 'lessons'));
-          batch.set(lessonRef, {
-            moduleId: moduleRef.id,
-            title: lessonTitle,
-            content: 'Contenido de la lección pendiente.',
-            order: lessonIndex,
-          });
+          batch.set(lessonRef, { ...lesson, moduleId: moduleRef.id, order: lessonIndex });
         });
       });
       
@@ -153,6 +164,14 @@ export default function LearnPage() {
     const pathRef = doc(firestore, 'users', user.uid, 'learningPaths', activeLearningPath.id);
     deleteDocumentNonBlocking(pathRef);
   }
+
+  const handleQuizSubmit = (lessonId: string) => {
+    setShowResults(prev => ({ ...prev, [lessonId]: true }));
+  };
+
+  const handleAnswerChange = (question: string, answer: string) => {
+    setSelectedAnswers(prev => ({ ...prev, [question]: answer }));
+  };
 
   if (isLoadingPaths) {
     return (
@@ -187,19 +206,71 @@ export default function LearnPage() {
             <CardContent>
                 <Accordion type="single" collapsible className="w-full">
                     {activeLearningPath.modules.sort((a, b) => a.order - b.order).map((module) => (
-                    <AccordionItem value={`item-${module.id}`} key={module.id}>
-                        <AccordionTrigger className="font-headline text-lg">
-                        {module.title}
+                    <AccordionItem value={`module-${module.id}`} key={module.id}>
+                        <AccordionTrigger className="font-headline text-lg hover:no-underline">
+                          {module.title}
                         </AccordionTrigger>
                         <AccordionContent>
-                        <ul className="space-y-3 pl-6 list-none">
-                            {module.lessons.sort((a, b) => a.order - b.order).map((lesson) => (
-                            <li key={lesson.id} className="flex items-start">
-                                <CheckCircle2 className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
-                                <span>{lesson.title}</span>
-                            </li>
-                            ))}
-                        </ul>
+                           <Accordion type="single" collapsible className="w-full pl-4">
+                             {module.lessons.sort((a, b) => a.order - b.order).map((lesson) => (
+                                <AccordionItem value={`lesson-${lesson.id}`} key={lesson.id}>
+                                  <AccordionTrigger className="text-base">
+                                    <div className="flex items-center gap-2">
+                                       <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                       <span>{lesson.title}</span>
+                                    </div>
+                                  </AccordionTrigger>
+                                  <AccordionContent className="space-y-6 pt-4 pr-4">
+                                      <p className="text-muted-foreground">{lesson.detailedContent}</p>
+                                      
+                                      <Separator />
+                                      
+                                      <div>
+                                        <h4 className="font-semibold flex items-center gap-2 mb-3"><Lightbulb className="text-yellow-500"/>Tips Prácticos</h4>
+                                        <ul className="space-y-2 list-disc pl-5 text-muted-foreground">
+                                          {lesson.practicalTips.map((tip, i) => <li key={i}>{tip}</li>)}
+                                        </ul>
+                                      </div>
+
+                                      <Separator />
+
+                                      <div>
+                                        <h4 className="font-semibold flex items-center gap-2 mb-3"><BookCopy className="text-blue-500"/>Ejemplo Real</h4>
+                                        <p className="text-muted-foreground italic border-l-4 pl-4">{lesson.realExample}</p>
+                                      </div>
+
+                                      <Separator />
+
+                                      <div className="p-4 bg-muted/50 rounded-lg">
+                                        <h4 className="font-semibold flex items-center gap-2 mb-4"><TestTube2 className="text-purple-500"/>Pon a prueba tu conocimiento</h4>
+                                        <div className="space-y-4">
+                                          {lesson.quiz.map((q, i) => (
+                                            <div key={i}>
+                                              <p className="font-medium mb-2">{q.question}</p>
+                                              <div className="space-y-1">
+                                                {q.options.map(opt => (
+                                                  <div key={opt} className="flex items-center gap-2">
+                                                    <input type="radio" id={`${lesson.id}-${i}-${opt}`} name={`${lesson.id}-${i}`} value={opt} onChange={() => handleAnswerChange(q.question, opt)} disabled={showResults[lesson.id]}/>
+                                                    <label htmlFor={`${lesson.id}-${i}-${opt}`}>{opt}</label>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                              {showResults[lesson.id] && (
+                                                <div className={`mt-2 text-sm p-2 rounded-md flex items-center gap-2 ${selectedAnswers[q.question] === q.correctAnswer ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                  {selectedAnswers[q.question] === q.correctAnswer ? <CheckCircle2 size={16}/> : <AlertTriangle size={16}/>}
+                                                  {selectedAnswers[q.question] === q.correctAnswer ? '¡Correcto!' : `Correcto: ${q.correctAnswer}`}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {!showResults[lesson.id] && <Button size="sm" onClick={() => handleQuizSubmit(lesson.id)}>Verificar Respuestas</Button>}
+                                        </div>
+                                      </div>
+
+                                  </AccordionContent>
+                                </AccordionItem>
+                             ))}
+                           </Accordion>
                         </AccordionContent>
                     </AccordionItem>
                     ))}
