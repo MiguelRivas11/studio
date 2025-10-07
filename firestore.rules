@@ -1,212 +1,224 @@
 /**
- * @file Firestore Security Rules for FinLit Tutor Application
- * @core_philosophy This ruleset enforces a strict user-ownership model for personal data, while allowing public read access to global data like badges. User data is segregated under the /users/{userId} path.
- * @data_structure Data is nested under /users/{userId} for user-specific content (learning paths, assessments, progress). The /badges collection stores globally accessible badge definitions.
- * @key_security_decisions User listing is implicitly disallowed by the absence of a top-level /users collection. All write operations are protected by ownership checks, and data consistency is enforced between paths and document data.  The badges collection is readable by anyone, but writeable by no one (in this version).
+ * @description This ruleset enforces a strict user-ownership model for private data, while allowing public read access to certain global data.
+ * @dataStructure
+ *  - /users/{userId}: Stores user profiles, accessible only to the user themselves.
+ *  - /users/{userId}/learningPaths/{learningPathId}: Stores learning paths owned by the user.
+ *  - /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}: Stores modules within a learning path, accessible only to the learning path owner.
+ *  - /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}/lessons/{lessonId}: Stores lessons within a module, accessible only to the module owner.
+ *  - /users/{userId}/financialAssessments/{assessmentId}: Stores financial assessments owned by the user.
+ *  - /badges/{badgeId}: Stores global badge definitions, publicly readable.
+ *  - /users/{userId}/userBadges/{userBadgeId}: Stores user-specific badges, accessible only to the user.
+ *  - /users/{userId}/progress/{progressId}: Stores user-specific progress data, accessible only to the user.
+ *  - /users/{userId}/goals/{goalId}: Stores user-specific goals, accessible only to the user.
+ *  - /users/{userId}/budgets/{budgetId}: Stores user-specific budget data, accessible only to the user.
+ * @keySecurityDecisions
+ *  - User data is strictly segregated and accessible only to the owning user.
+ *  - Listing of user documents is disallowed.
+ *  - Badges are publicly readable but not writable.
+ * @denormalizationForAuthorization
+ *  - Collections under `/users/{userId}` such as LearningPath, FinancialAssessment, UserBadge, and Progress include the `userId` field to allow direct authorization checks without needing to `get()` the user document.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     /**
-     * @description Enforces user-ownership for user profiles. Allows a user to read and write their own profile data.
+     * @description Manages user profiles. Only the user can read and write their own profile.
      * @path /users/{userId}
-     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
-     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can create their profile with id 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @allow (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can read their profile.
+     * @allow (update) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can update their profile.
+     * @allow (delete) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can delete their profile.
+     * @deny (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot create profile with id 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @deny (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot read user profile 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isExistingOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-ownership for learning paths. Allows a user to read and write their own learning paths.
+     * @description Manages learning paths for a specific user. Only the owner can read and write.
      * @path /users/{userId}/learningPaths/{learningPathId}
-     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
-     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
-     * @principle Enforces document ownership for writes and validates relational integrity on creation.
+     * @allow (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can create a learning path with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @allow (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can read learning path owned by them.
+     * @allow (update) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can update learning path owned by them.
+     * @allow (delete) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can delete learning path owned by them.
+     * @deny (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot create learning path with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @deny (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot read learning path owned by user 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @principle Enforces document ownership for all operations.  Validates userId on create.
      */
     match /users/{userId}/learningPaths/{learningPathId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-ownership for modules within a learning path. Allows a user to read and write modules within their own learning paths.
+     * @description Manages modules within a learning path.  Only the owner can read and write.
      * @path /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}
-     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
-     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
-     * @principle Enforces document ownership for writes, inheriting ownership from the parent learning path.
+     * @allow (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can create a module within their learning path.
+     * @allow (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can read module within their learning path.
+     * @allow (update) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can update module within their learning path.
+     * @allow (delete) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can delete module within their learning path.
+     * @deny (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot read module within learning path owned by user 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @principle Inherits ownership from parent LearningPath.
      */
     match /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-ownership for lessons within a module. Allows a user to read and write lessons within their own modules.
+     * @description Manages lessons within a module. Only the owner can read and write.
      * @path /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}/lessons/{lessonId}
-     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
-     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
-     * @principle Enforces document ownership for writes, inheriting ownership from the parent module.
+     * @allow (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can create a lesson within their module.
+     * @allow (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can read lesson within their module.
+     * @allow (update) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can update lesson within their module.
+     * @allow (delete) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can delete lesson within their module.
+     * @deny (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot read lesson within module owned by user 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @principle Inherits ownership from parent Module.
      */
     match /users/{userId}/learningPaths/{learningPathId}/modules/{moduleId}/lessons/{lessonId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-ownership for financial assessments. Allows a user to read and write their own financial assessments.
+     * @description Manages financial assessments for a specific user. Only the owner can read and write.
      * @path /users/{userId}/financialAssessments/{assessmentId}
-     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
-     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
-     * @principle Enforces document ownership for writes and validates relational integrity on creation.
+     * @allow (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can create a financial assessment with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @allow (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can read their own financial assessment.
+     * @allow (update) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can update their own financial assessment.
+     * @allow (delete) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can delete their own financial assessment.
+     * @deny (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot create a financial assessment with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @deny (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot read financial assessment owned by user 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @principle Enforces document ownership.  Validates userId on create.
      */
     match /users/{userId}/financialAssessments/{assessmentId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows public read access to badge definitions.  Write access is denied.
+     * @description Manages global badge definitions. Publicly readable, but not writable.
      * @path /badges/{badgeId}
-     * @allow (get, list) to all users.
-     * @deny (create, update, delete) to all users.
-     * @principle Allows public read access to global data, while restricting write access.
+     * @allow (get) Any user can read a badge.
+     * @allow (list) Any user can list badges.
+     * @deny (create) No one can create badges.
+     * @deny (update) No one can update badges.
+     * @deny (delete) No one can delete badges.
+     * @principle Public read access, no write access.
      */
     match /badges/{badgeId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Enforces user-ownership for user badges. Allows a user to read and write their own user badges.
+     * @description Manages user-specific badges. Only the owner can read and write.
      * @path /users/{userId}/userBadges/{userBadgeId}
-     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
-     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
-     * @principle Enforces document ownership for writes and validates relational integrity on creation.
+     * @allow (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can create a user badge with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @allow (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can read user badge owned by them.
+     * @allow (update) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can update user badge owned by them.
+     * @allow (delete) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can delete user badge owned by them.
+     * @deny (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot create user badge with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @deny (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot read user badge owned by user 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @principle Enforces document ownership. Validates userId on create.
      */
     match /users/{userId}/userBadges/{userBadgeId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-ownership for progress entries. Allows a user to read and write their own progress entries.
+     * @description Manages progress information for a specific user. Only the owner can read and write.
      * @path /users/{userId}/progress/{progressId}
-     * @allow (create, get, update, delete) if the user's auth UID matches the userId.
-     * @deny (create, get, update, delete) if the user's auth UID does not match the userId.
-     * @principle Enforces document ownership for writes and validates relational integrity on creation.
+     * @allow (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can create progress with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @allow (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can read progress owned by them.
+     * @allow (update) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can update progress owned by them.
+     * @allow (delete) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can delete progress owned by them.
+     * @deny (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot create progress with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @deny (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot read progress owned by user 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @principle Enforces document ownership. Validates userId on create.
      */
     match /users/{userId}/progress/{progressId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
+
+    /**
+     * @description Manages financial goals for a specific user. Only the owner can read and write.
+     * @path /users/{userId}/goals/{goalId}
+     * @allow (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can read goals owned by them.
+     * @allow (list) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can list goals owned by them.
+     * @allow (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can create goals with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @allow (update) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can update goals owned by them.
+     * @allow (delete) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can delete goals owned by them.
+     * @deny (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot read goals owned by user 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @principle Enforces document ownership.  Validates userId on create.
+     */
+    match /users/{userId}/goals/{goalId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages budget information for a specific user. Only the owner can read and write.
+     * @path /users/{userId}/budgets/{budgetId}
+     * @allow (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can create a budget with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @allow (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can read their own budget.
+     * @allow (update) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can update their own budget.
+     * @allow (delete) User 'cMBi07HNq8c34hKAfQe0pQN8A1x1' can delete their own budget.
+     * @deny (create) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot create a budget with userId 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @deny (get) User 'cMBi07HNq8c34hKAfQe0pQN8A1x2' cannot read budget owned by user 'cMBi07HNq8c34hKAfQe0pQN8A1x1'.
+     * @principle Enforces document ownership. Validates userId on create.
+     */
+    match /users/{userId}/budgets/{budgetId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+
+  // Helper Functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return isSignedIn() && request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
   }
 }
